@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — NCS-EMG</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <img src="{{ url_for('static', filename='aiims_patna_logo.png') }}" alt="AIIMS Patna" class="header-logo">
+      <div class="header-text">
+        <h1>Settings</h1>
+        <nav><a href="{{ url_for('index') }}">← Back to Home</a></nav>
+      </div>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash flash-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form action="{{ url_for('settings') }}" method="POST">
+    <div class="card">
+      <h3>Lab Configuration</h3>
+      <div class="form-group">
+        <label>Lab Name (appears on report header)</label>
+        <input type="text" name="lab_name" value="{{ config.lab_name }}" class="full-input">
+      </div>
+      <div class="form-group">
+        <label>Default Doctor Name</label>
+        <input type="text" name="default_doctor" value="{{ config.default_doctor }}" placeholder="Dr. Yogesh Kumar" class="full-input">
+      </div>
+      <div class="form-group">
+        <label>Default Performed by</label>
+        <input type="text" name="default_performed_by" value="{{ config.get('default_performed_by', 'Mr. Manish Kumar') }}" placeholder="Mr. Manish Kumar" class="full-input">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Claude AI Enhancement (Optional)</h3>
+      <p class="hint">
+        Add your Anthropic API key to enable silent AI enhancement of generated reports.
+        The app works fully without it — AI enhancement is invisible and optional.
+      </p>
+      <div class="form-group">
+        <label>Anthropic API Key</label>
+        {% if has_api_key %}
+        <div class="api-status">✓ API key configured</div>
+        {% endif %}
+        <input type="password" name="api_key" placeholder="sk-ant-... (leave blank to keep existing)" class="full-input">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Save Settings</button>
+    </div>
+  </form>
+</div>
+</body>
+</html>

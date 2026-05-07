@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Entry — NCS-EMG</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <img src="{{ url_for('static', filename='aiims_patna_logo.png') }}" alt="AIIMS Patna" class="header-logo">
+      <div class="header-text">
+        <h1>{{ config.lab_name }}</h1>
+        <h2>Data Entry Form</h2>
+        <nav><a href="{{ url_for('index') }}">← Start Over</a> | <a href="{{ url_for('settings') }}">⚙ Settings</a></nav>
+      </div>
+    </div>
+  </header>
+
+  <form action="{{ url_for('generate') }}" method="POST" id="dataForm">
+    <input type="hidden" name="sid" value="{{ sid }}">
+
+    <!-- Patient Demographics -->
+    <section class="card">
+      <h3>Patient Demographics</h3>
+      <div class="demo-grid">
+        {% set pt = parsed.patient %}
+        <div><label>Name</label><input type="text" name="pt_name" value="{{ pt.name }}"></div>
+        <div><label>Age / Sex</label><input type="text" name="pt_age_sex" value="{{ pt.age }} years / {{ pt.sex }}"></div>
+        <div><label>ID</label><input type="text" name="pt_id" value="{{ pt.id }}"></div>
+        <div><label>Date</label><input type="text" name="pt_date" value="{{ pt.date }}"></div>
+        <div><label>Referring Dept</label><input type="text" name="pt_dept" value="{{ pt.referring_dept }}"></div>
+        <div><label>Doctor</label><input type="text" name="pt_doctor" value="{{ pt.doctor }}"></div>
+        <div><label>Performed by</label><input type="text" name="pt_performed_by" value="{{ pt.performed_by }}"></div>
+        <div class="full-width"><label>Diagnosis</label><input type="text" name="pt_diagnosis" value="{{ pt.diagnosis }}"></div>
+      </div>
+    </section>
+
+    <!-- NCS Section -->
+    {% if 'NCS' in report_types %}
+    <section class="card">
+      <h3>Motor CV <span class="badge">From RTF</span></h3>
+      {% if parsed.motor_ncs %}
+      <div class="table-scroll">
+        <table class="ncs-table">
+          <thead>
+            <tr>
+              <th>Test</th><th>Site</th><th>Lat (ms)</th><th>Ampl (mV)</th>
+              <th>Dur (ms)</th><th>Area</th><th>Stim (mA)</th><th>Stim (ms)</th>
+              <th>Dist (mm)</th><th>Time (ms)</th><th>Vel (m/s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set ns = namespace(current_group='') %}
+            {% for row in parsed.motor_ncs %}
+              {% if row.group != ns.current_group %}
+                {% set ns.current_group = row.group %}
+                <tr class="group-header"><td colspan="11">{{ row.group }}</td></tr>
+              {% endif %}
+              <tr>
+                <td>{{ row.test_no or '' }}</td>
+                <td>{{ row.site or '' }}</td>
+                <td>{{ row.lat_ms or '' }}</td>
+                <td>{{ row.ampl_mv or '' }}</td>
+                <td>{{ row.dur_ms or '' }}</td>
+                <td>{{ row.area or '' }}</td>
+                <td>{{ row.stim_ma or '' }}</td>
+                <td>{{ row.stim_ms or '' }}</td>
+                <td>{{ row.dist_mm or '' }}</td>
+                <td>{{ row.time_ms or '' }}</td>
+                <td>{{ row.vel_ms or '' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="hint">No motor NCS data found in RTF.</p>
+      {% endif %}
+
+      <h3 style="margin-top:1.5rem">Sensory CV <span class="badge">From RTF</span></h3>
+      {% if parsed.sensory_ncs %}
+      <div class="table-scroll">
+        <table class="ncs-table">
+          <thead>
+            <tr>
+              <th>Test</th><th>Site</th><th>Lat (ms)</th><th>Ampl (µV)</th>
+              <th>Dur (ms)</th><th>Area</th><th>Stim (mA)</th><th>Stim (ms)</th>
+              <th>Dist (mm)</th><th>Time (ms)</th><th>Vel (m/s)</th><th>Norm</th><th>Dev%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set ns = namespace(current_group='') %}
+            {% for row in parsed.sensory_ncs %}
+              {% if row.group != ns.current_group %}
+                {% set ns.current_group = row.group %}
+                <tr class="group-header"><td colspan="13">{{ row.group }}</td></tr>
+              {% endif %}
+              <tr>
+                <td>{{ row.test_no or '' }}</td>
+                <td>{{ row.site or '' }}</td>
+                <td>{{ row.lat_ms or '' }}</td>
+                <td>{{ row.ampl_uv or '' }}</td>
+                <td>{{ row.dur_ms or '' }}</td>
+                <td>{{ row.area or '' }}</td>
+                <td>{{ row.stim_ma or '' }}</td>
+                <td>{{ row.stim_ms or '' }}</td>
+                <td>{{ row.dist_mm or '' }}</td>
+                <td>{{ row.time_ms or '' }}</td>
+                <td>{{ row.vel_ms or '' }}</td>
+                <td>{{ row.vel_norm or '' }}</td>
+                <td>{{ row.vel_dev_pct or '' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="hint">No sensory NCS data found in RTF.</p>
+      {% endif %}
+
+      {% if parsed.f_waves %}
+      <h3 style="margin-top:1.5rem">F-Wave Findings <span class="badge">From RTF</span></h3>
+      <div class="table-scroll">
+        <table class="ncs-table">
+          <thead>
+            <tr><th>Test</th><th>Fmin lat (ms)</th><th>M lat (ms)</th><th>Fmin-M lat (ms)</th><th>Max Vprox (m/s)</th></tr>
+          </thead>
+          <tbody>
+            {% set ns = namespace(current_group='') %}
+            {% for row in parsed.f_waves %}
+              {% if row.group != ns.current_group %}
+                {% set ns.current_group = row.group %}
+                <tr class="group-header"><td colspan="5">{{ row.group }}</td></tr>
+              {% endif %}
+              <tr>
+                <td>{{ row.test_no or '' }}</td>
+                <td>{{ row.fmin_lat_ms or '' }}</td>
+                <td>{{ row.m_lat_ms or '' }}</td>
+                <td>{{ row.fmin_m_lat_ms or '' }}</td>
+                <td>{{ row.max_vprox or '' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- VEP Section -->
+    {% if 'VEP' in report_types and parsed.vep %}
+    <section class="card">
+      <h3>VEP <span class="badge">From RTF</span></h3>
+      <div class="table-scroll">
+        <table class="ncs-table">
+          <thead>
+            <tr><th>N</th><th>Rec sites</th><th>N75 lat</th><th>P100 lat</th><th>N145 lat</th>
+            <th>P100-N145 ampl</th><th>Stim side</th><th>Stimulus</th><th>Stim dur</th></tr>
+          </thead>
+          <tbody>
+            {% for row in parsed.vep %}
+            <tr>
+              <td>{{ row.n or '' }}</td><td>{{ row.rec_sites or '' }}</td>
+              <td>{{ row.n75_lat or '' }}</td><td>{{ row.p100_lat or '' }}</td>
+              <td>{{ row.n145_lat or '' }}</td><td>{{ row.p100_n145_ampl or '' }}</td>
+              <td>{{ row.stim_side or '' }}</td><td>{{ row.stimulus or '' }}</td>
+              <td>{{ row.stim_dur or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- EMG Section -->
+    {% if 'EMG' in report_types %}
+    <section class="card">
+      <h3>EMG Data Entry <span class="badge badge-input">Manual</span></h3>
+      <div class="emg-photo-bar">
+        <label class="btn-photo" title="Take or upload a photo of the filled EMG sheet — Claude will extract the data automatically">
+          📷 Read from photo
+          <input type="file" id="emgPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="readEmgPhoto(this)">
+        </label>
+        <span id="emgPhotoStatus" class="emg-photo-status"></span>
+      </div>
+      <p class="hint">Enter EMG findings from the paper EMG sheet, or use the photo button above.</p>
+
+      <div id="emgTableWrapper">
+        <div class="table-scroll">
+          <table id="emgTable" class="emg-table">
+            <thead>
+              <tr>
+                <th rowspan="2">Side</th>
+                <th rowspan="2">Muscle</th>
+                <th rowspan="2">Insertion EMG</th>
+                <th rowspan="2">Resting EMG</th>
+                <th colspan="4">MUP Findings</th>
+                <th colspan="3">Interference</th>
+                <th rowspan="2">Notes</th>
+                <th rowspan="2"></th>
+              </tr>
+              <tr>
+                <th>Amplitude</th>
+                <th>Duration</th>
+                <th>Polyphasic</th>
+                <th>Recruitment</th>
+                <th>Amplitude</th>
+                <th>Complete/<br>Incomplete</th>
+                <th>Unitary</th>
+              </tr>
+            </thead>
+            <tbody id="emgBody">
+              <!-- Rows added by JS -->
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn-secondary" onclick="addEmgRow()">+ Add Muscle</button>
+
+        <!-- Muscle Key -->
+        <div class="emg-muscle-key">
+          <strong>Muscle Key</strong>
+          <div class="emg-key-group">
+            <span class="emg-key-label">Upper Limb:</span>
+            DL = Deltoid &nbsp;|&nbsp;
+            SS = Supraspinatus &nbsp;|&nbsp;
+            IS = Infraspinatus &nbsp;|&nbsp;
+            BB = Biceps Brachii &nbsp;|&nbsp;
+            TR = Triceps &nbsp;|&nbsp;
+            BR = Brachioradialis &nbsp;|&nbsp;
+            FCR = Flexor Carpi Radialis &nbsp;|&nbsp;
+            FCU = Flexor Carpi Ulnaris &nbsp;|&nbsp;
+            APB = Abductor Pollicis Brevis &nbsp;|&nbsp;
+            ADM = Abductor Digiti Minimi &nbsp;|&nbsp;
+            IO = First Dorsal Interosseous &nbsp;|&nbsp;
+            LB = Lumbrical Brevis &nbsp;|&nbsp;
+            ED = Extensor Digitorum
+          </div>
+          <div class="emg-key-group">
+            <span class="emg-key-label">Lower Limb:</span>
+            VM = Vastus Medialis &nbsp;|&nbsp;
+            VL = Vastus Lateralis &nbsp;|&nbsp;
+            GN = Gastrocnemius &nbsp;|&nbsp;
+            FDL = Flexor Digitorum Longus &nbsp;|&nbsp;
+            FHL = Flexor Hallucis Longus &nbsp;|&nbsp;
+            TA = Tibialis Anterior &nbsp;|&nbsp;
+            EDL = Extensor Digitorum Longus &nbsp;|&nbsp;
+            EDB = Extensor Digitorum Brevis &nbsp;|&nbsp;
+            AHL = Abductor Hallucis &nbsp;|&nbsp;
+            HS = Hamstrings
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Generate Report →</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const MUSCLES_UL = ['DL','SS','IS','BB','TR','BR','FCR','FCU','APB','ADM','IO','LB','ED'];
+const MUSCLES_LL = ['VM','VL','GN','FDL','FHL','TA','EDL','EDB','AHL','HS'];
+const ALL_MUSCLES = [...MUSCLES_UL, ...MUSCLES_LL];
+
+const INSERTION_OPTS = ['Brief Normal','Prolonged','Reduced','Normal'];
+const RESTING_OPTS = ['Silent','Fibrillations','PSWs','Fasciculations','Giant potentials','Fibrillations + PSWs'];
+const AMP_OPTS = ['Normal','↑','↓','Not recordable','-',"Patient couldn't recruit"];
+const DUR_OPTS = ['Normal','↑','↓','-',"Patient couldn't recruit"];
+const POLY_OPTS = ['No','Yes','-',"Patient couldn't recruit"];
+const RECRUIT_OPTS = ['Normal','↓','↑',"Patient couldn't recruit"];
+const INTERF_AMP_OPTS   = ['Normal','↑ Large','↓ Small',"Patient couldn't recruit"];
+const INTERF_COMP_OPTS  = ['Complete','Incomplete',"Patient couldn't recruit"];
+const INTERF_UNIT_OPTS  = ['No','Yes','Single unit',"Patient couldn't recruit"];
+
+function updateSide(cb) {
+  const row = cb.closest('tr');
+  const checks = row.querySelectorAll('input[type=checkbox]');
+  const vals = [...checks].filter(c=>c.checked).map(c=>c.dataset.val);
+  const hidden = row.querySelector('.emg-side-val');
+  hidden.value = vals.length === 2 ? 'B' : (vals[0] || '');
+}
+
+function sel(opts, name, selected) {
+  return `<select name="${name}" ${name==='emg_recruitment[]'?'onchange="onRecruitChange(this)"':''}>${opts.map(o => `<option${o===selected?' selected':''}>${o}</option>`).join('')}</select>`;
+}
+
+function onRecruitChange(sel) {
+  if (sel.value === "Patient couldn't recruit") {
+    const row = sel.closest('tr');
+    ['emg_amplitude[]','emg_duration[]','emg_polyphasic[]',
+     'emg_interf_amp[]','emg_interf_complete[]','emg_interf_unitary[]'].forEach(n => {
+      const el = row.querySelector(`select[name="${n}"]`);
+      if (el) el.value = "Patient couldn't recruit";
+    });
+  }
+}
+
+function addEmgRow(data={}) {
+  const tbody = document.getElementById('emgBody');
+  const tr = document.createElement('tr');
+  const uid = Date.now() + Math.random();
+  tr.innerHTML = `
+    <td class="emg-side-cell">
+      <input type="hidden" name="emg_side[]" class="emg-side-val" value="${data.side||''}">
+      <label class="emg-side-check"><input type="checkbox" onchange="updateSide(this)" data-val="L" ${data.side==='L'||data.side==='B'?'checked':''}> L</label>
+      <label class="emg-side-check"><input type="checkbox" onchange="updateSide(this)" data-val="R" ${data.side==='R'||data.side==='B'?'checked':''}> R</label>
+    </td>
+    <td>
+      <input list="muscleList" name="emg_muscle[]" value="${data.muscle||''}" placeholder="Muscle" class="emg-muscle-input">
+      <datalist id="muscleList">${ALL_MUSCLES.map(m=>`<option value="${m}">`).join('')}</datalist>
+    </td>
+    <td>${sel(INSERTION_OPTS,'emg_insertion[]',data.insertion||'Brief Normal')}</td>
+    <td>${sel(RESTING_OPTS,'emg_resting[]',data.resting||'Silent')}</td>
+    <td>${sel(AMP_OPTS,'emg_amplitude[]',data.amplitude||'Normal')}</td>
+    <td>${sel(DUR_OPTS,'emg_duration[]',data.duration||'Normal')}</td>
+    <td>${sel(POLY_OPTS,'emg_polyphasic[]',data.polyphasic||'No')}</td>
+    <td>${sel(RECRUIT_OPTS,'emg_recruitment[]',data.recruitment||'Normal')}</td>
+    <td>${sel(INTERF_AMP_OPTS,'emg_interf_amp[]',data.interf_amp||'Normal')}</td>
+    <td>${sel(INTERF_COMP_OPTS,'emg_interf_complete[]',data.interf_complete||'Complete')}</td>
+    <td>${sel(INTERF_UNIT_OPTS,'emg_interf_unitary[]',data.interf_unitary||'No')}</td>
+    <td><input type="text" name="emg_notes[]" value="${data.notes||''}" placeholder="Notes" style="width:80px"></td>
+    <td><button type="button" onclick="this.closest('tr').remove()">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+// Start with one empty row if EMG section is shown
+{% if 'EMG' in report_types %}
+addEmgRow();
+{% endif %}
+
+async function readEmgPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('emgPhotoStatus');
+  status.textContent = 'Reading photo…';
+  status.style.color = '#1a3c6e';
+
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const resp = await fetch('/parse_emg_photo', { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (data.error) {
+      status.textContent = 'Error: ' + data.error;
+      status.style.color = '#c0392b';
+      return;
+    }
+
+    // Clear existing rows and fill from extracted data
+    document.getElementById('emgBody').innerHTML = '';
+    data.rows.forEach(row => addEmgRow(row));
+
+    status.textContent = `✓ ${data.rows.length} muscle(s) extracted — please review`;
+    status.style.color = '#27ae60';
+  } catch(e) {
+    status.textContent = 'Failed: ' + e.message;
+    status.style.color = '#c0392b';
+  }
+
+  // Reset input so same file can be re-selected
+  input.value = '';
+}
+</script>
+</body>
+</html>

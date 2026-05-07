@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Review — NCS-EMG</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <img src="{{ url_for('static', filename='aiims_patna_logo.png') }}" alt="AIIMS Patna" class="header-logo">
+      <div class="header-text">
+        <h1>{{ config.lab_name }}</h1>
+        <h2>Report Review</h2>
+        <nav>
+          <a href="{{ url_for('index') }}">+ New Report</a> |
+          <a href="{{ url_for('settings') }}">⚙ Settings</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  {% if was_enhanced %}
+  <div class="flash flash-info">✨ Report enhanced with Claude AI</div>
+  {% endif %}
+
+  <div class="report-layout">
+
+    <!-- Editable Report -->
+    <div class="report-main">
+      <form action="{{ url_for('download') }}" method="POST" id="reportForm">
+        <input type="hidden" name="sid" value="{{ sid }}">
+
+        <div class="card report-card">
+          <h3>{{ config.lab_name }}</h3>
+
+          <!-- Patient Info -->
+          <div class="patient-block">
+            {% set pt = parsed.patient %}
+            <div><b>Patient:</b> {{ pt.name }}</div>
+            <div><b>Age/Sex:</b> {{ pt.age }} yrs / {{ pt.sex }}</div>
+            <div><b>ID:</b> {{ pt.id }}</div>
+            <div><b>Date:</b> {{ pt.date }}</div>
+            <div><b>Diagnosis:</b> {{ pt.diagnosis }}</div>
+            <div><b>Dept:</b> {{ pt.referring_dept }}</div>
+          </div>
+
+          <div class="report-title">
+            {% if 'NCS' in report_types and 'EMG' in report_types %}NCS-EMG REPORT
+            {% elif 'VEP' in report_types %}VEP REPORT
+            {% elif 'EMG' in report_types %}EMG REPORT
+            {% else %}NCS REPORT{% endif %}
+          </div>
+
+          {% if report.intro %}
+          <div class="section-label">Summary</div>
+          <textarea name="intro" class="report-text">{{ report.intro }}</textarea>
+          {% endif %}
+
+          {% if 'NCS' in report_types and report.motor_summary %}
+          <div class="section-label">Motor NCS</div>
+          <textarea name="motor_summary" class="report-text">{{ report.motor_summary }}</textarea>
+          {% endif %}
+
+          {% if 'NCS' in report_types and report.sensory_summary %}
+          <div class="section-label">Sensory NCS</div>
+          <textarea name="sensory_summary" class="report-text">{{ report.sensory_summary }}</textarea>
+          {% endif %}
+
+          {% if report.fwave_summary %}
+          <div class="section-label">F-Waves</div>
+          <textarea name="fwave_summary" class="report-text">{{ report.fwave_summary }}</textarea>
+          {% endif %}
+
+          {% if 'EMG' in report_types and report.emg_summary %}
+          <div class="section-label">EMG</div>
+          <textarea name="emg_summary" class="report-text">{{ report.emg_summary }}</textarea>
+          {% endif %}
+
+          {% if 'VEP' in report_types and report.vep_summary %}
+          <div class="section-label">VEP</div>
+          <textarea name="vep_summary" class="report-text">{{ report.vep_summary }}</textarea>
+          {% endif %}
+
+          <div class="section-label impression-label">Impression</div>
+          <textarea name="impression" class="report-text impression-text">{{ report.impression }}</textarea>
+
+          <div class="signature-block">
+            <div>Senior Resident/Consultant</div>
+            <div>Dept. of Physiology</div>
+          </div>
+        </div>
+
+        <div class="report-options">
+          <strong>Report Options</strong>
+          {% if 'NCS' in report_types %}
+          <label class="option-check">
+            <input type="checkbox" name="include_ncs_tables" value="1" checked>
+            Include NCS data tables
+          </label>
+          {% endif %}
+          {% if ncs_images_count > 0 or emg_images_count > 0 %}
+          <label class="option-check">
+            <input type="checkbox" name="include_graphs" value="1" checked>
+            Include waveform graphs ({{ ncs_images_count + emg_images_count }} found)
+          </label>
+          {% endif %}
+          {% if 'EMG' in report_types %}
+          <label class="option-check">
+            <input type="checkbox" name="include_emg_table" value="1" checked>
+            Include EMG findings table
+          </label>
+          {% endif %}
+          {% if 'VEP' in report_types %}
+          <label class="option-check">
+            <input type="checkbox" name="include_vep_table" value="1" checked>
+            Include VEP table
+          </label>
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">⬇ Download .docx</button>
+          <a href="{{ url_for('index') }}" class="btn-secondary">Start New Report</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Abnormality Flags Sidebar -->
+    <div class="report-sidebar">
+      <div class="card">
+        <h3>Abnormality Flags</h3>
+
+        {% if classification.motor %}
+        <h4>Motor NCS</h4>
+        <table class="flags-table">
+          <thead><tr><th>Nerve</th><th>Result</th></tr></thead>
+          <tbody>
+          {% for r in classification.motor %}
+          <tr class="{{ 'row-abn' if r.classification != 'normal' else 'row-ok' }}">
+            <td>{{ r.group }}</td>
+            <td>
+              <span class="badge badge-{{ r.classification }}">{{ r.classification }}</span>
+              {% for note in r.notes %}<br><small>⚠ {{ note }}</small>{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+        {% if classification.sensory %}
+        <h4>Sensory NCS</h4>
+        <table class="flags-table">
+          <thead><tr><th>Nerve</th><th>Result</th></tr></thead>
+          <tbody>
+          {% for r in classification.sensory %}
+          <tr class="{{ 'row-abn' if r.classification not in ('normal', None) else 'row-ok' }}">
+            <td>{{ r.group }}</td>
+            <td><span class="badge badge-{{ r.classification }}">{{ r.classification }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+        {% if classification.fwaves %}
+        <h4>F-Waves</h4>
+        <table class="flags-table">
+          <thead><tr><th>Nerve</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for r in classification.fwaves %}
+          <tr class="{{ 'row-abn' if r.status not in ('normal', None) else 'row-ok' }}">
+            <td>{{ r.group }}</td>
+            <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+        {% if classification.vep %}
+        <h4>VEP</h4>
+        <table class="flags-table">
+          <thead><tr><th>Side</th><th>P100</th></tr></thead>
+          <tbody>
+          {% for r in classification.vep %}
+          <tr class="{{ 'row-abn' if r.p100_status not in ('normal', None) else 'row-ok' }}">
+            <td>{{ r.side }}</td>
+            <td><span class="badge badge-{{ r.p100_status }}">{{ r.p100_status }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+
+        <div class="pattern-box">
+          <b>Overall pattern:</b> {{ classification.overall_pattern }}
+        </div>
+      </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  {% if emg_images_count > 0 %}
+  <div id="emgWaveformPanel" class="waveform-panel" style="display:none;">
+    <div class="waveform-panel-header">
+      <span class="waveform-panel-title">EMG Waveform Tracings</span>
+      <span class="waveform-panel-count">{{ emg_images_count }} trace{{ 's' if emg_images_count != 1 else '' }} extracted from RTF</span>
+    </div>
+    <div class="waveform-grid">
+      {% for label in emg_image_labels %}
+      <div class="waveform-cell">
+        <div class="waveform-cell-label">{{ label }}</div>
+        <img src="{{ url_for('emg_preview', sid=sid, idx=loop.index0) }}"
+             alt="{{ label }}"
+             class="waveform-cell-img"
+             loading="lazy"
+             onerror="this.closest('.waveform-cell').style.display='none'">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if ncs_images_count > 0 %}
+  <div id="waveformPanel" class="waveform-panel" style="display:none;">
+    <div class="waveform-panel-header">
+      <span class="waveform-panel-title">NCS Waveform Tracings</span>
+      <span class="waveform-panel-count">{{ ncs_images_count }} trace{{ 's' if ncs_images_count != 1 else '' }} extracted from RTF</span>
+    </div>
+    <div class="waveform-grid">
+      {% for label in ncs_image_labels %}
+      <div class="waveform-cell">
+        <div class="waveform-cell-label">{{ label }}</div>
+        <img src="{{ url_for('ncs_preview', sid=sid, idx=loop.index0) }}"
+             alt="{{ label }}"
+             class="waveform-cell-img"
+             loading="lazy"
+             onerror="this.closest('.waveform-cell').style.display='none'">
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+// Auto-resize textareas
+document.querySelectorAll('.report-text').forEach(ta => {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+  ta.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = this.scrollHeight + 'px';
+  });
+});
+
+// Waveform panel toggle — controls both NCS and EMG panels
+const graphsCb = document.querySelector('input[name="include_graphs"]');
+const panels = [
+  document.getElementById('waveformPanel'),
+  document.getElementById('emgWaveformPanel'),
+].filter(Boolean);
+
+if (graphsCb && panels.length) {
+  function syncPanels() {
+    panels.forEach(panel => {
+      if (graphsCb.checked) {
+        panel.style.display = 'block';
+        requestAnimationFrame(() => panel.classList.add('panel-open'));
+      } else {
+        panel.classList.remove('panel-open');
+        setTimeout(() => { panel.style.display = 'none'; }, 300);
+      }
+    });
+  }
+  graphsCb.addEventListener('change', syncPanels);
+  syncPanels();
+}
+</script>
+</body>
+</html>

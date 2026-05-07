@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCS-EMG Report Generator</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <img src="{{ url_for('static', filename='aiims_patna_logo.png') }}" alt="AIIMS Patna" class="header-logo">
+      <div class="header-text">
+        <h1>{{ config.lab_name }}</h1>
+        <h2>NCS-EMG Report Generator</h2>
+        <nav><a href="{{ url_for('settings') }}">⚙ Settings</a></nav>
+      </div>
+    </div>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash flash-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form action="{{ url_for('parse') }}" method="POST" enctype="multipart/form-data" id="mainForm">
+
+    <!-- Report Type Selection -->
+    <section class="card">
+      <h3>1. Select Report Type(s)</h3>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="report_types" value="NCS" id="cb_ncs" checked> NCS</label>
+        <label><input type="checkbox" name="report_types" value="EMG" id="cb_emg"> EMG</label>
+        <label><input type="checkbox" name="report_types" value="VEP" id="cb_vep"> VEP</label>
+      </div>
+    </section>
+
+    <!-- RTF Upload -->
+    <section class="card" id="rtf_section">
+      <h3>2. Upload Neurosoft RTF File <a href="#" class="help-link" title="How to export RTF from Neurosoft">?</a></h3>
+      <div class="drop-zone" id="dropZone">
+        <span id="dropText">Drag & drop RTF file here, or click to select</span>
+        <input type="file" name="rtf_file" id="rtfFile" accept=".rtf" style="display:none">
+      </div>
+      <p id="fileName" class="file-name"></p>
+    </section>
+
+    <!-- Manual Demographics (EMG-only) -->
+    <section class="card hidden" id="manual_demo">
+      <h3>Patient Demographics (Manual Entry)</h3>
+      <div class="demo-grid">
+        <div><label>Name</label><input type="text" name="pt_name" placeholder="Patient Name"></div>
+        <div><label>Age (years)</label><input type="number" name="pt_age" placeholder="Age"></div>
+        <div><label>Sex</label>
+          <select name="pt_sex">
+            <option value="">Select</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div><label>ID / CR No.</label><input type="text" name="pt_id" placeholder="ID"></div>
+        <div><label>Date</label><input type="date" name="pt_date"></div>
+        <div><label>Diagnosis</label><input type="text" name="pt_diagnosis" placeholder="Diagnosis"></div>
+        <div><label>Referring Department</label><input type="text" name="pt_dept"></div>
+        <div><label>Doctor</label><input type="text" name="pt_doctor" value="{{ config.default_doctor }}"></div>
+        <div><label>Referring Doctor</label><input type="text" name="pt_ref_doctor"></div>
+        <div><label>Performed by</label><input type="text" name="pt_performed_by"></div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Open Form →</button>
+    </div>
+  </form>
+</div>
+
+<!-- Help Modal -->
+<div id="helpModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeHelp()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>How to prepare your Neurosoft RTF export</span>
+      <button class="modal-close" onclick="closeHelp()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-section-title">Before exporting, ensure these fields are filled in the patient header:</p>
+      <ul>
+        <li>Patient's Name</li>
+        <li>CR / ID Number</li>
+        <li>Age and Sex</li>
+        <li>Referring Department</li>
+        <li>Diagnosis</li>
+      </ul>
+      <p class="modal-section-title" style="margin-top:1.25rem;">What the RTF must contain, by report type:</p>
+      <table class="modal-table">
+        <thead><tr><th>Report Type</th><th>What's needed</th></tr></thead>
+        <tbody>
+          <tr><td><strong>NCS</strong></td><td>Data tables + waveform graphs</td></tr>
+          <tr><td><strong>EMG</strong></td><td>Waveform graphs <em>(findings entered manually on the next page)</em></td></tr>
+          <tr><td><strong>VEP</strong></td><td>Data table + P100 waveform graph</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const cbNcs = document.getElementById('cb_ncs');
+const cbEmg = document.getElementById('cb_emg');
+const cbVep = document.getElementById('cb_vep');
+const rtfSection = document.getElementById('rtf_section');
+const manualDemo = document.getElementById('manual_demo');
+const dropZone = document.getElementById('dropZone');
+const rtfFile = document.getElementById('rtfFile');
+const fileName = document.getElementById('fileName');
+const dropText = document.getElementById('dropText');
+
+function updateForm() {
+  const emgOnly = cbEmg.checked && !cbNcs.checked && !cbVep.checked;
+  manualDemo.classList.toggle('hidden', !emgOnly);
+}
+
+[cbNcs, cbEmg, cbVep].forEach(cb => cb.addEventListener('change', updateForm));
+
+dropZone.addEventListener('click', () => rtfFile.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    rtfFile.files = dt.files;
+    fileName.textContent = file.name;
+    dropText.textContent = '✓ ' + file.name;
+  }
+});
+rtfFile.addEventListener('change', () => {
+  if (rtfFile.files[0]) {
+    fileName.textContent = rtfFile.files[0].name;
+    dropText.textContent = '✓ ' + rtfFile.files[0].name;
+    const name = rtfFile.files[0].name.toLowerCase();
+    if (name.includes('emg')) cbEmg.checked = true;
+    if (name.includes('vep')) { cbVep.checked = true; cbNcs.checked = false; }
+    updateForm();
+  }
+});
+
+function openHelp(e) { e.preventDefault(); document.getElementById('helpModal').style.display='flex'; }
+function closeHelp() { document.getElementById('helpModal').style.display='none'; }
+document.querySelector('.help-link').addEventListener('click', openHelp);
+</script>
+</body>
+</html>
