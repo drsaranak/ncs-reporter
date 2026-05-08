@@ -576,16 +576,14 @@ def extract_ncs_images(rtf_path, parsed_data=None):
         if next_wmf_idx is None:
             continue
 
-        # Build a descriptive label using nerve group name if available
+        # Use generic section label — nerve name is already printed inside the waveform image
         lt_lower = label_text.lower()
         if 'motor' in lt_lower:
-            nerve = motor_groups[motor_idx] if motor_idx < len(motor_groups) else f'Motor {motor_idx+1}'
             motor_idx += 1
-            display = f"Motor CV : {nerve}"
+            display = "Motor CV"
         elif 'sensory' in lt_lower:
-            nerve = sensory_groups[sensory_idx] if sensory_idx < len(sensory_groups) else f'Sensory {sensory_idx+1}'
             sensory_idx += 1
-            display = f"Sensory CV : {nerve}"
+            display = "Sensory CV"
         else:
             display = label_text
 
