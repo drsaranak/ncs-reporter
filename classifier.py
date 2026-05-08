@@ -96,28 +96,45 @@ def classify_motor(motor_rows, age_years=None):
 
         flags = flag_motor_row(distal_row, age_years)
 
-        # For velocity: check ALL rows (motor CV is calculated from proximal sites)
+        # CV check across all rows (proximal stimulation carries velocity)
+        # Two separate thresholds:
+        #   < cv_min       → cv 'slow' for reporting in summary text
+        #   < 75% cv_min   → cv_demy 'slow' for demyelination classification
+        nerve_key = re.sub(r'^[LRB][,\s]+', '', group or '').strip().lower()
         for row in rows:
             vel = row.get('vel_ms')
             if vel and vel != 'NR':
                 try:
                     from normatives import get_motor_normatives
-                    nerve_key = re.sub(r'^[LRB][,\s]+', '', group or '').strip().lower()
                     _, cv_min, _ = get_motor_normatives(nerve_key, age_years)
-                    if cv_min and float(vel) < cv_min:
-                        flags['cv'] = 'slow'
-                        break
+                    if cv_min:
+                        vel_f = float(vel)
+                        if vel_f < cv_min:
+                            flags['cv'] = 'slow'           # for summary text
+                        if vel_f < 0.75 * cv_min:
+                            flags['cv_demy'] = 'slow'      # for demyelination classification
+                    break
                 except (ValueError, TypeError):
                     pass
 
-        amp_status = flags.get('amp')
-        cv_status = flags.get('cv')
-        dl_status = flags.get('dl')
+        amp_status     = flags.get('amp')
+        cv_status      = flags.get('cv')                   # reporting: < cv_min
+        cv_demy_status = flags.get('cv_demy', 'normal')    # demyelination: < 75% cv_min
+        dl_status      = flags.get('dl')                   # reporting: > ULN
+        dl_demy_status = flags.get('dl_demy', 'normal')    # demyelination: > 130% ULN
 
-        # Conduction flag: slow CV or prolonged DL = demyelinating
+        # Conduction flag — threshold depends on amplitude status:
+        # - Amplitude LOW:    use strict criteria (130% DL / 75% CV) to avoid labelling
+        #                     an axonal+borderline nerve as "mixed with demyelination"
+        # - Amplitude NORMAL: use simple criteria (DL > ULN / CV < cv_min) — any
+        #                     conduction abnormality with preserved amplitude = demyelinating
         cond_flag = 'normal'
-        if cv_status == 'slow' or dl_status == 'prolonged':
-            cond_flag = 'demyelinating'
+        if amp_status == 'low':
+            if cv_demy_status == 'slow' or dl_demy_status == 'prolonged':
+                cond_flag = 'demyelinating'
+        else:
+            if cv_status == 'slow' or dl_status == 'prolonged':
+                cond_flag = 'demyelinating'
 
         # Classification
         if amp_status == 'nr':
@@ -242,12 +259,18 @@ def classify_sensory(sensory_rows, age_years=None):
         row = rows[0] if rows else {}
         flags = flag_sensory_row(row, age_years)
 
-        amp_status = flags.get('amp')
-        dl_status  = flags.get('dl')
+        amp_status     = flags.get('amp')
+        dl_status      = flags.get('dl')       # reporting: > ULN
+        dl_demy_status = flags.get('dl_demy', 'normal')  # demyelination: > 130% ULN
 
-        # Amplitude takes priority — low/NR = axonal regardless of latency
+        # Classification:
+        # - Amplitude LOW + DL > 130% ULN → mixed (both axonal and demyelinating)
+        # - Amplitude LOW only             → axonal
+        # - DL > ULN only (amp normal)    → demyelinating
         if amp_status == 'nr':
             classification = 'absent'
+        elif amp_status == 'low' and dl_demy_status == 'prolonged':
+            classification = 'mixed'
         elif amp_status == 'low':
             classification = 'axonal'
         elif dl_status == 'prolonged':
@@ -261,6 +284,7 @@ def classify_sensory(sensory_rows, age_years=None):
             'group': group,
             'classification': classification,
             'amplitude_status': amp_status,
+            'dl_status': dl_status,
             'conduction_status': dl_status,
             'notes': [],
             'modality': 'sensory',

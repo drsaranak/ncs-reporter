@@ -640,17 +640,17 @@ def generate_docx(parsed_data, report_dict, emg_form_data, report_types,
 
         _build_fwave_table(doc, parsed_data.get('f_waves', []))
 
-    # ── NCS Waveforms (below NCS tables) ─────────────────────────────────────
+    # ── EMG Table (follows NCS tables) ───────────────────────────────────────
+    if 'EMG' in report_types and emg_form_data:
+        _build_emg_table(doc, emg_form_data)
+
+    # ── NCS Waveforms ─────────────────────────────────────────────────────────
     if ncs_images:
         _build_ncs_waveforms(doc, ncs_images)
 
-    # ── EMG Waveform Tracings (before table) ─────────────────────────────────
+    # ── EMG Waveform Tracings ─────────────────────────────────────────────────
     if 'EMG' in report_types and emg_images:
         _build_emg_waveforms(doc, emg_images)
-
-    # ── EMG Table ─────────────────────────────────────────────────────────────
-    if 'EMG' in report_types and emg_form_data:
-        _build_emg_table(doc, emg_form_data)
 
     # ── VEP Table ─────────────────────────────────────────────────────────────
     if 'VEP' in report_types and parsed_data.get('vep') and include_vep_table:

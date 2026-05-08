@@ -57,18 +57,48 @@ def generate_motor_paragraph(motor_results):
 
     # Axonal loss
     if axonal_nerves:
-        nerve_list = _nerve_phrase(axonal_nerves, ['axonal'])
-        joined = _join_nerves(nerve_list)
+        def _axonal_cond_str(r):
+            """Build conduction descriptor for a single axonal nerve."""
+            parts = []
+            if r.get('dl_status') == 'prolonged':
+                parts.append('prolonged distal motor latency')
+            if r.get('cv_status') == 'slow':
+                parts.append('decreased conduction velocity')
+            return ', '.join(parts) if parts else ''
+
         if len(axonal_nerves) == 1:
-            sentences.append(
-                f"Reduced amplitude of compound muscle action potentials (CMAPs), "
-                f"normal distal motor latency and conduction velocity in the {joined} nerve."
-            )
+            r = axonal_nerves[0]
+            joined = _join_nerves(_nerve_phrase([r], ['axonal']))
+            cond = _axonal_cond_str(r)
+            if cond:
+                sentences.append(
+                    f"Reduced amplitude of compound muscle action potentials (CMAPs), "
+                    f"{cond} in the {joined} nerve."
+                )
+            else:
+                sentences.append(
+                    f"Reduced amplitude of compound muscle action potentials (CMAPs), "
+                    f"normal distal motor latency and conduction velocity in the {joined} nerve."
+                )
         else:
-            sentences.append(
-                f"Reduced amplitude of compound muscle action potentials (CMAPs), "
-                f"normal distal motor latency and conduction velocity in the {joined} nerves."
-            )
+            # Group nerves that share the same conduction profile; split those that differ
+            from collections import defaultdict
+            profile_groups = defaultdict(list)
+            for r in axonal_nerves:
+                profile_groups[_axonal_cond_str(r)].append(r)
+            for cond, group_nerves in profile_groups.items():
+                joined = _join_nerves(_nerve_phrase(group_nerves, ['axonal']))
+                suffix = 'nerve' if len(group_nerves) == 1 else 'nerves'
+                if cond:
+                    sentences.append(
+                        f"Reduced amplitude of compound muscle action potentials (CMAPs), "
+                        f"{cond} in the {joined} {suffix}."
+                    )
+                else:
+                    sentences.append(
+                        f"Reduced amplitude of compound muscle action potentials (CMAPs), "
+                        f"normal distal motor latency and conduction velocity in the {joined} {suffix}."
+                    )
 
     # Demyelinating — only mention what is actually abnormal
     for r in demy_nerves:
@@ -165,7 +195,8 @@ def generate_sensory_paragraph(sensory_results):
 
     absent_nerves = [r for r in sensory_results if r['classification'] == 'absent']
     axonal_nerves = [r for r in sensory_results if r['classification'] == 'axonal']
-    demy_nerves = [r for r in sensory_results if r['classification'] == 'demyelinating']
+    mixed_nerves  = [r for r in sensory_results if r['classification'] == 'mixed']
+    demy_nerves   = [r for r in sensory_results if r['classification'] == 'demyelinating']
     normal_nerves = [r for r in sensory_results if r['classification'] == 'normal']
 
     sentences = []
@@ -178,12 +209,38 @@ def generate_sensory_paragraph(sensory_results):
             f"Absence of {side + ' ' if side else ''}{nerve} sensory conduction."
         )
 
-    # Axonal (reduced amplitude)
-    for r in axonal_nerves:
+    # Axonal (reduced amplitude) — group all into one combined sentence
+    if axonal_nerves:
+        from collections import OrderedDict
+        nerve_sides = OrderedDict()
+        for r in axonal_nerves:
+            n = r['nerve'].lower()
+            if n not in nerve_sides:
+                nerve_sides[n] = set()
+            nerve_sides[n].add(r['side'])
+
+        parts = []
+        for nerve, sides in nerve_sides.items():
+            if 'left' in sides and 'right' in sides:
+                parts.append(f"bilateral {nerve}")
+            elif 'left' in sides:
+                parts.append(f"left {nerve}")
+            elif 'right' in sides:
+                parts.append(f"right {nerve}")
+            else:
+                parts.append(nerve)
+
+        joined = _join_nerves(parts)
+        cap = joined[0].upper() + joined[1:]
+        sentences.append(f"{cap} SNAP amplitude is reduced.")
+
+    # Mixed (reduced amplitude + prolonged latency >130% ULN)
+    for r in mixed_nerves:
         side = r['side']
         nerve = r['nerve'].lower()
         sentences.append(
-            f"{(side + ' ').capitalize() if side else ''}{nerve.capitalize()} SNAP amplitude is reduced."
+            f"{(side + ' ').capitalize() if side else ''}{nerve.capitalize()} SNAP amplitude "
+            f"is reduced with prolonged latency, suggestive of axonal loss with demyelinating features."
         )
 
     # Demyelinating (slow CV)
@@ -195,7 +252,7 @@ def generate_sensory_paragraph(sensory_results):
         )
 
     # Normal
-    if normal_nerves and (absent_nerves or axonal_nerves or demy_nerves):
+    if normal_nerves and (absent_nerves or axonal_nerves or mixed_nerves or demy_nerves):
         if len(normal_nerves) == 1:
             r = normal_nerves[0]
             side = r['side']
@@ -208,7 +265,7 @@ def generate_sensory_paragraph(sensory_results):
             sentences.append(
                 "SNAP amplitudes, latency and conduction velocity were normal in all other tested nerves."
             )
-    elif not absent_nerves and not axonal_nerves and not demy_nerves:
+    elif not absent_nerves and not axonal_nerves and not mixed_nerves and not demy_nerves:
         sentences.append(
             "SNAP amplitudes, latency and conduction velocity were normal in all the tested nerves."
         )

@@ -257,11 +257,11 @@ def flag_motor_row(row, age_years=None):
         site = (row.get('site') or '').lower()
         if site in ('wrist', 'ankle', 'dist.', 'distal') or 'erb' in site:
             try:
-                pct = float(lat) / dl_max * 100
-                if pct > 130:
-                    flags['dl'] = 'prolonged'
-                else:
-                    flags['dl'] = 'normal'
+                lat_f = float(lat)
+                # Report as prolonged if DL exceeds the ULN (used in summary text)
+                flags['dl'] = 'prolonged' if lat_f > dl_max else 'normal'
+                # Demyelination criterion: >130% of ULN (used for classification only)
+                flags['dl_demy'] = 'prolonged' if lat_f / dl_max * 100 > 130 else 'normal'
             except ValueError:
                 pass
 
@@ -297,7 +297,11 @@ def flag_sensory_row(row, age_years=None):
     # Latency check — only at distal stimulation site
     if lat is not None and dl_max is not None:
         try:
-            flags['dl'] = 'prolonged' if float(lat) > dl_max else 'normal'
+            lat_f = float(lat)
+            # Report as prolonged if DL exceeds ULN
+            flags['dl'] = 'prolonged' if lat_f > dl_max else 'normal'
+            # Demyelination criterion: >130% of ULN (for mixed classification)
+            flags['dl_demy'] = 'prolonged' if lat_f / dl_max * 100 > 130 else 'normal'
         except ValueError:
             pass
 
