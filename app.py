@@ -550,10 +550,12 @@ def download():
 def parse_emg_photo():
     """
     Accept a photo of the handwritten EMG sheet.
-    Send to Claude vision → return extracted EMG rows as JSON.
+    Send to local Gemma vision model via LM Studio → return extracted EMG rows as JSON.
+    LM Studio must be running with a vision-capable model loaded (default: localhost:1234).
     """
     import base64
-    import anthropic
+    import re
+    import httpx
 
     if 'photo' not in request.files:
         return jsonify({'error': 'No photo uploaded'}), 400
@@ -563,14 +565,18 @@ def parse_emg_photo():
     image_b64 = base64.standard_b64encode(image_bytes).decode('utf-8')
     mime = photo.content_type or 'image/jpeg'
 
-    api_key = os.getenv('ANTHROPIC_API_KEY', '')
-    if not api_key:
-        return jsonify({'error': 'API key not configured'}), 500
+    lm_studio_url = os.getenv('LM_STUDIO_URL', 'http://localhost:1234')
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        # Auto-detect whichever model is currently loaded in LM Studio
+        models_resp = httpx.get(f'{lm_studio_url}/v1/models', timeout=5)
+        models_resp.raise_for_status()
+        models_data = models_resp.json()
+        model_id = models_data['data'][0]['id']
+    except Exception as e:
+        return jsonify({'error': f'Cannot reach LM Studio at {lm_studio_url} — make sure it is running with a model loaded. ({e})'}), 500
 
-        prompt = """This is a photo of a handwritten EMG reporting sheet from a neurophysiology lab.
+    prompt = """This is a photo of a handwritten EMG reporting sheet from a neurophysiology lab.
 
 Extract the EMG table data. Each filled row has these columns:
 - Muscle (abbreviation, e.g. TR, BB, APB, VM, TA)
@@ -598,23 +604,26 @@ Example output:
   {"side":"R","muscle":"APB","insertion":"Brief Normal","resting":"Fibrillations","amplitude":"↓","duration":"Normal","polyphasic":"No","recruitment":"↓","interference":"Incomplete","notes":""}
 ]"""
 
-        response = client.messages.create(
-            model='claude-haiku-4-5-20251001',
-            max_tokens=1500,
-            messages=[{
-                'role': 'user',
-                'content': [
-                    {'type': 'image', 'source': {
-                        'type': 'base64', 'media_type': mime, 'data': image_b64
-                    }},
-                    {'type': 'text', 'text': prompt}
-                ]
-            }]
+    try:
+        resp = httpx.post(
+            f'{lm_studio_url}/v1/chat/completions',
+            json={
+                'model': model_id,
+                'max_tokens': 1500,
+                'messages': [{
+                    'role': 'user',
+                    'content': [
+                        {'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{image_b64}'}},
+                        {'type': 'text', 'text': prompt}
+                    ]
+                }]
+            },
+            timeout=300
         )
+        resp.raise_for_status()
+        text = resp.json()['choices'][0]['message']['content'].strip()
 
-        text = response.content[0].text.strip()
         # Strip markdown code block if present
-        import re
         m = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL)
         if m:
             text = m.group(1).strip()
