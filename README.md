@@ -107,6 +107,55 @@ Patient data never leaves your machine. Sessions, outputs, and RTF files are sto
 
 ---
 
+## EMG Photo Feature (Read from Photo)
+
+The **📷 Read from photo** button on the data entry form lets you photograph a handwritten EMG sheet and have the data extracted automatically.
+
+### Requirements
+
+- [LM Studio](https://lmstudio.ai) — free desktop app (Mac/Windows/Linux)
+- A vision-capable model loaded in LM Studio (tested with **Gemma 4 e4b**)
+
+### Setup
+
+1. Download and install LM Studio
+2. Open LM Studio → search for and download **google/gemma-4-e4b** (or any vision model)
+3. Load the model → click the **`</>`** icon in the left sidebar → toggle **Start Server**
+4. The server runs on `http://localhost:1234` by default — no configuration needed
+
+### Custom port
+
+If LM Studio runs on a different port, set this in your `.env` file:
+
+```
+LM_STUDIO_URL=http://localhost:YOUR_PORT
+```
+
+### Photo tips
+
+- Good lighting, flat surface, no glare
+- All columns must be visible in frame
+- HEIC photos (iPhone) are supported — converted automatically
+- The model may take 30–60 seconds on complex sheets (reasoning model)
+
+### What it reads
+
+| Column | Expected values |
+|---|---|
+| Side | L / R / B |
+| Muscle | Abbreviation (APB, BB, TA, VM…) |
+| Insertion EMG | Brief Normal / Prolonged / Reduced |
+| Resting EMG | Silent / Fibrillations / PSWs / Fasciculations / Giant potentials |
+| Amplitude | Normal / ↑ / ↓ / Not recordable |
+| Duration | Normal / ↑ / ↓ |
+| Polyphasic | No / Yes |
+| Recruitment | Normal / ↓ / ↑ / Patient couldn't recruit |
+| Interference | Normal full / Incomplete / Low amplitude incomplete unitary… |
+
+Always review extracted data before generating the report.
+
+---
+
 ## Dependencies
 
 | Package | Purpose |
@@ -115,5 +164,6 @@ Patient data never leaves your machine. Sessions, outputs, and RTF files are sto
 | python-docx | Word document generation |
 | striprtf | RTF parsing |
 | Pillow | Waveform image processing and autocrop |
-| anthropic | Claude AI integration (optional) |
+| httpx | HTTP client for LM Studio API calls |
+| anthropic | Claude AI integration (optional, for report enhancement) |
 | python-dotenv | Environment variable management |

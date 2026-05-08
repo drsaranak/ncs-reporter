@@ -555,6 +555,8 @@ def parse_emg_photo():
     """
     import base64
     import re
+    import subprocess
+    import tempfile
     import httpx
 
     if 'photo' not in request.files:
@@ -562,8 +564,27 @@ def parse_emg_photo():
 
     photo = request.files['photo']
     image_bytes = photo.read()
-    image_b64 = base64.standard_b64encode(image_bytes).decode('utf-8')
     mime = photo.content_type or 'image/jpeg'
+
+    # HEIC (iPhone photos) must be converted to JPEG before sending to LM Studio
+    if mime in ('image/heic', 'image/heif') or photo.filename.lower().endswith(('.heic', '.heif')):
+        with tempfile.NamedTemporaryFile(suffix='.heic', delete=False) as src:
+            src.write(image_bytes)
+            src_path = src.name
+        dst_path = src_path.replace('.heic', '.jpg')
+        try:
+            subprocess.run(['sips', '-s', 'format', 'jpeg', src_path, '--out', dst_path],
+                           check=True, capture_output=True)
+            with open(dst_path, 'rb') as f:
+                image_bytes = f.read()
+            mime = 'image/jpeg'
+        finally:
+            import os as _os
+            _os.unlink(src_path)
+            if _os.path.exists(dst_path):
+                _os.unlink(dst_path)
+
+    image_b64 = base64.standard_b64encode(image_bytes).decode('utf-8')
 
     lm_studio_url = os.getenv('LM_STUDIO_URL', 'http://localhost:1234')
 
@@ -621,12 +642,18 @@ Example output:
             timeout=300
         )
         resp.raise_for_status()
-        text = resp.json()['choices'][0]['message']['content'].strip()
+        text = (resp.json()['choices'][0]['message']['content'] or '').strip()
+
+        if not text:
+            return jsonify({'error': 'Model returned an empty response — try again or use a clearer photo'}), 500
 
         # Strip markdown code block if present
         m = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL)
         if m:
             text = m.group(1).strip()
+
+        if not text:
+            return jsonify({'error': 'Could not extract JSON from model response'}), 500
 
         rows = json.loads(text)
         return jsonify({'rows': rows})

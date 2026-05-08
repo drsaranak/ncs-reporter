@@ -181,11 +181,20 @@
     <section class="card">
       <h3>EMG Data Entry <span class="badge badge-input">Manual</span></h3>
       <div class="emg-photo-bar">
-        <label class="btn-photo" title="Take or upload a photo of the filled EMG sheet — Claude will extract the data automatically">
+        <label class="btn-photo" title="Take or upload a photo of the filled EMG sheet — Gemma AI will extract the data automatically">
           📷 Read from photo
-          <input type="file" id="emgPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="readEmgPhoto(this)">
+          <input type="file" id="emgPhotoInput" accept="image/*,image/heic,image/heif" capture="environment" style="display:none" onchange="readEmgPhoto(this)">
         </label>
+        <button type="button" class="photo-hint-btn" onclick="document.getElementById('emgPhotoHint').classList.toggle('hidden')" title="What should the photo show?">ℹ</button>
         <span id="emgPhotoStatus" class="emg-photo-status"></span>
+      </div>
+      <div id="emgPhotoHint" class="photo-hint-box hidden">
+        <strong>For best results, the photo should show a filled EMG sheet with these columns:</strong>
+        <table class="hint-table">
+          <thead><tr><th>Side</th><th>Muscle</th><th>Insertion</th><th>Resting</th><th>Amplitude</th><th>Duration</th><th>Polyphasic</th><th>Recruitment</th><th>Interference</th><th>Notes</th></tr></thead>
+          <tbody><tr><td>L / R / B</td><td>e.g. APB, BB, TA</td><td>Brief Normal / Prolonged / Reduced</td><td>Silent / Fibs / PSWs</td><td>Normal / ↑ / ↓</td><td>Normal / ↑ / ↓</td><td>No / Yes</td><td>Normal / ↓ / ↑</td><td>Normal full / Incomplete / Low amplitude…</td><td>free text</td></tr></tbody>
+        </table>
+        <p style="margin:6px 0 0;font-size:0.82em;color:#555;">Tip: Good lighting, flat surface, all columns visible. HEIC (iPhone) photos are supported.</p>
       </div>
       <p class="hint">Enter EMG findings from the paper EMG sheet, or use the photo button above.</p>
 

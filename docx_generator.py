@@ -287,20 +287,28 @@ def _build_emg_table(doc, emg_form_data):
 
     _add_section_heading(doc, 'EMG Findings')
 
-    # 9 columns: Muscle | Ins EMG | Rest EMG | Amplitude | Duration | Polyphasic | Recruitment | Interference | Notes
-    keys = ['muscle', 'insertion', 'resting', 'amplitude', 'duration',
-            'polyphasic', 'recruitment', 'interference', 'notes']
+    # Omit Notes column entirely if no row has any note text
+    any_notes = any(bool((row.get('notes') or '').strip()) for row in emg_form_data if row.get('muscle'))
 
-    table = doc.add_table(rows=0, cols=9)
+    # 8 or 9 columns: Muscle | Ins EMG | Rest EMG | Amplitude | Duration | Polyphasic | Recruitment | Interference [| Notes]
+    keys = ['muscle', 'insertion', 'resting', 'amplitude', 'duration',
+            'polyphasic', 'recruitment', 'interference']
+    if any_notes:
+        keys.append('notes')
+
+    num_cols = 9 if any_notes else 8
+    table = doc.add_table(rows=0, cols=num_cols)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = 'Table Grid'
 
     # ── Header row 1: Muscle | Ins EMG | Rest EMG | MUP Findings (span 4) | Interference | Notes ──
     hdr1 = table.add_row()
 
-    # Cols 0-2 and 7-8 span 2 rows vertically
-    for col, text in [(0, 'Muscle'), (1, 'Insertion\nEMG'), (2, 'Resting\nEMG'),
-                      (7, 'Interference'), (8, 'Notes')]:
+    # Cols 0-2 and 7 (and optionally 8) span 2 rows vertically
+    vmerge_hdrs = [(0, 'Muscle'), (1, 'Insertion\nEMG'), (2, 'Resting\nEMG'), (7, 'Interference')]
+    if any_notes:
+        vmerge_hdrs.append((8, 'Notes'))
+    for col, text in vmerge_hdrs:
         _header_cell(hdr1.cells[col], text)
         _set_vmerge(hdr1.cells[col], restart=True)
 
@@ -312,7 +320,8 @@ def _build_emg_table(doc, emg_form_data):
     hdr2 = table.add_row()
 
     # Continuation cells for vertically merged columns
-    for col in [0, 1, 2, 7, 8]:
+    vmerge_cont = [0, 1, 2, 7] + ([8] if any_notes else [])
+    for col in vmerge_cont:
         cell = hdr2.cells[col]
         _set_cell_no_shading(cell)
         _set_cell_border(cell, top=_thin(), left=_thin(), bottom=_thin(), right=_thin())
@@ -370,15 +379,16 @@ def _build_emg_table(doc, emg_form_data):
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 _set_para_spacing(p, before=15, after=15)
                 _run(p, "Patient could not recruit", size=8)
-                # Notes (col 8)
-                cell = data_row.cells[8]
-                _set_cell_no_shading(cell)
-                _set_cell_border(cell, top=_thin(), left=_thin(),
-                                 bottom=_thin(), right=_thin())
-                p = cell.paragraphs[0]
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                _set_para_spacing(p, before=15, after=15)
-                _run(p, row.get('notes', '') or '', size=8)
+                # Notes (col 8) — only if notes column is present
+                if any_notes:
+                    cell = data_row.cells[8]
+                    _set_cell_no_shading(cell)
+                    _set_cell_border(cell, top=_thin(), left=_thin(),
+                                     bottom=_thin(), right=_thin())
+                    p = cell.paragraphs[0]
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    _set_para_spacing(p, before=15, after=15)
+                    _run(p, row.get('notes', '') or '', size=8)
             else:
                 for i, key in enumerate(keys):
                     cell = data_row.cells[i]
